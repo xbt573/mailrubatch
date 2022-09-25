@@ -45,16 +45,15 @@ func GetFiles(folder string) (*FileTree, error) {
 }
 
 func DownloadFiles(downloadFolder string, tree *FileTree) {
+	if downloadFolder != "." {
+		os.Mkdir(downloadFolder, os.ModePerm)
+	}
+
 	for _, file := range tree.Files {
 		if file.IsTree() {
 			folder := file.(*FileTree).Folder
 
-			err := os.Mkdir(folder, os.ModePerm)
-			if err != nil {
-				log.Println(err)
-			}
-
-			DownloadFiles(folder, file.(*FileTree))
+			DownloadFiles(fmt.Sprintf("%v/%v", downloadFolder, folder), file.(*FileTree))
 			continue
 		}
 
@@ -90,6 +89,7 @@ func DownloadFile(folder string, file File) {
 		currentFile,
 		allFiles,
 	)
+	progress.Play(0)
 
 	_, err = io.Copy(io.MultiWriter(f, progress), res.Body)
 	if err != nil {

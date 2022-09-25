@@ -11,7 +11,10 @@ var REGEXP = regexp.MustCompile(`public/(\S+/\S+)`)
 
 var (
 	help = flag.Bool("help", false, "Display this message")
-	h    = flag.Bool("h", false, "Display this message")
+	h    = flag.Bool("h", false, "Display this message (shorthand)")
+
+	output = flag.String("output", ".", "Output folder")
+	o      = flag.String("o", ".", "Output folder (shorthand)")
 )
 
 func main() {
@@ -35,5 +38,15 @@ func main() {
 		panic(err)
 	}
 
-	DownloadFiles(".", tree)
+	var path string
+
+	if *output != "." {
+		path = *output
+	}
+
+	if *o != "." {
+		path = *o
+	}
+
+	DownloadFiles(path, tree)
 }
