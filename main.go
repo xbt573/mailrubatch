@@ -15,6 +15,9 @@ var (
 
 	output = flag.String("output", ".", "Output folder")
 	o      = flag.String("o", ".", "Output folder (shorthand)")
+
+	compress = flag.Bool("compress", false, "Compress downloads")
+	c        = flag.Bool("c", false, "Compress downloads (shorthand)")
 )
 
 func main() {
@@ -42,11 +45,19 @@ func main() {
 
 	if *output != "." {
 		path = *output
+		tree.Folder = *output
 	}
 
 	if *o != "." {
 		path = *o
+		tree.Folder = *o
 	}
 
 	DownloadFiles(path, tree)
+
+	if *compress || *c {
+		fmt.Println("Archiving...")
+		ArchiveFiles(path, tree)
+		RemoveFiles(path, tree)
+	}
 }

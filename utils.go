@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"log"
@@ -59,6 +61,8 @@ func DownloadFiles(downloadFolder string, tree *FileTree) {
 
 		DownloadFile(downloadFolder, file.(File))
 	}
+
+	currentFile = 1
 }
 
 func DownloadFile(folder string, file File) {
@@ -101,4 +105,119 @@ func DownloadFile(folder string, file File) {
 
 	currentFile++
 	progress.Finish()
+}
+
+func RemoveFiles(basePath string, tree *FileTree) {
+	for _, node := range tree.Files {
+		if node.IsTree() {
+			subTree := node.(*FileTree)
+
+			RemoveFiles(
+				fmt.Sprintf("%v/%v", basePath, subTree.Folder),
+				subTree,
+			)
+			continue
+		}
+
+		file := node.(File)
+		os.Remove(
+			fmt.Sprintf("%v/%v", basePath, file.Name),
+		)
+	}
+
+	if basePath != "." {
+		os.Remove(basePath)
+	}
+}
+
+func FlatTree(tree *FileTree) []string {
+	flatFiles := make([]string, 0)
+
+	for _, node := range tree.Files {
+		if node.IsTree() {
+			subTree := node.(*FileTree)
+			files := FlatTree(subTree)
+
+			for _, subFile := range files {
+				flatFiles = append(
+					flatFiles,
+					fmt.Sprintf("%v/%v", tree.Folder, subFile),
+				)
+			}
+			continue
+		}
+
+		file := node.(File)
+		flatFiles = append(
+			flatFiles,
+			fmt.Sprintf("%v/%v", tree.Folder, file.Name),
+		)
+	}
+
+	return flatFiles
+}
+
+func ArchiveFiles(basePath string, tree *FileTree) {
+	flatFiles := FlatTree(tree)
+
+	var path = basePath
+	if path == "." {
+		path = "archive"
+	}
+
+	archive, err := os.Create(
+		fmt.Sprintf("%v.tar.gz", path),
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer archive.Close()
+
+	gzipBuffer := gzip.NewWriter(archive)
+	defer gzipBuffer.Close()
+
+	tarBuffer := tar.NewWriter(gzipBuffer)
+	defer tarBuffer.Close()
+
+	for _, path := range flatFiles {
+		file, err := os.Open(path)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer file.Close()
+
+		stat, err := file.Stat()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		header := &tar.Header{
+			Name:    path,
+			Mode:    0666,
+			Size:    stat.Size(),
+			ModTime: stat.ModTime(),
+			Uid:     os.Getuid(),
+			Gid:     os.Getgid(),
+		}
+
+		if err := tarBuffer.WriteHeader(header); err != nil {
+			log.Fatalln(err)
+		}
+
+		progress := NewProgressbar(
+			path,
+			0,
+			stat.Size(),
+			currentFile,
+			allFiles,
+		)
+
+		if _, err := io.Copy(io.MultiWriter(progress, tarBuffer), file); err != nil {
+			progress.Finish()
+			log.Fatalln(err)
+		}
+
+		currentFile++
+		progress.Finish()
+	}
 }
