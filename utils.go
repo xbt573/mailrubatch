@@ -9,6 +9,21 @@ import (
 	"os"
 )
 
+var allSize int64
+var downloadedSize int64
+
+func GetPercent() int {
+	if allSize == 0 {
+		return 100
+	}
+
+	if downloadedSize == 0 {
+		return 0
+	}
+
+	return int(downloadedSize / (allSize / 100))
+}
+
 func GetFiles(folder string) (*FileTree, error) {
 	tree := new(FileTree)
 
@@ -33,9 +48,11 @@ func GetFiles(folder string) (*FileTree, error) {
 		tree.Files = append(tree.Files, File{
 			Name:    file.Name,
 			Weblink: file.Weblink,
+			Size:    file.Size,
 		})
 	}
 
+	allSize = res.Body.Size
 	return tree, nil
 }
 
@@ -47,7 +64,7 @@ func DownloadFiles(downloadFolder string, tree *FileTree) {
 
 			err := os.Mkdir(folder, os.ModePerm)
 			if err != nil {
-				panic(err)
+				log.Println(err)
 			}
 
 			DownloadFiles(folder, file.(*FileTree))
@@ -72,17 +89,20 @@ func DownloadFile(folder string, file File) {
 	}
 	defer res.Body.Close()
 
-	data, err := io.ReadAll(res.Body)
+	f, err := os.Create(fmt.Sprintf("%v/%v", folder, file.Name))
 	if err != nil {
 		log.Printf("download %v: %v", fmt.Sprintf("%v/%v", folder, file.Name), err)
 		return
 	}
+	defer f.Close()
 
-	err = os.WriteFile(fmt.Sprintf("%v/%v", folder, file.Name), data, os.ModePerm)
+	_, err = io.Copy(f, res.Body)
 	if err != nil {
 		log.Printf("download %v: %v", fmt.Sprintf("%v/%v", folder, file.Name), err)
+		os.Remove(fmt.Sprintf("%v/%v", folder, file.Name))
 		return
 	}
 
-	log.Printf("download %v: finished", fmt.Sprintf("%v/%v", folder, file.Name))
+	downloadedSize += file.Size
+	log.Printf("download %v: finished (%v%%)", fmt.Sprintf("%v/%v", folder, file.Name), GetPercent())
 }

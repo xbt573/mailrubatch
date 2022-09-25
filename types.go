@@ -17,10 +17,12 @@ type Response struct {
 }
 
 type Body struct {
+	Size int64       `json:"size"`
 	List []CloudFile `json:"list"`
 }
 
 type CloudFile struct {
+	Size    int64  `json:"size"`
 	Name    string `json:"name"`
 	Weblink string `json:"weblink"`
 	Type    string `json:"type"`
@@ -31,6 +33,7 @@ type FileNode interface {
 }
 
 type File struct {
+	Size    int64
 	Name    string
 	Weblink string
 }
